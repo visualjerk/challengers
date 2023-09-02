@@ -30,7 +30,7 @@ async function join() {
 const events = ref<GameEvent[]>([])
 const gameEvents = gameClient.gameEvents({})
 const unsubscribe = gameEvents.responses.onMessage((event) => {
-  events.value.push(event)
+  events.value.unshift(event)
 })
 onBeforeUnmount(() => unsubscribe())
 </script>

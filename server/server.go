@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"sync"
 
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
 	"google.golang.org/grpc"
@@ -19,26 +18,39 @@ var (
 	port = flag.Int("port", 50051, "The server port")
 )
 
+type subscriber struct {
+	stream pb.Game_GameEventsServer
+	done   chan bool
+}
+
+func newSubscriber(stream pb.Game_GameEventsServer) *subscriber {
+	return &subscriber{stream, make(chan bool)}
+}
+
+func (s *subscriber) notify(event *pb.GameEvent) error {
+	if err := s.stream.Send(event); err != nil {
+		s.done <- true
+		return err
+	}
+	return nil
+}
+
 type gameServer struct {
 	pb.GameServer
-	eventListener []chan *pb.GameEvent
+	subscribers []*subscriber
 }
 
 func newServer() *gameServer {
 	s := &gameServer{
-		eventListener: []chan *pb.GameEvent{},
+		subscribers: []*subscriber{},
 	}
 	return s
 }
 
 func (s *gameServer) addEvent(event *pb.GameEvent) {
-	for _, events := range s.eventListener {
-		go publishEvent(events, event)
+	for _, subscriber := range s.subscribers {
+		go subscriber.notify(event)
 	}
-}
-
-func publishEvent(events chan *pb.GameEvent, event *pb.GameEvent) {
-	events <- event
 }
 
 func (s *gameServer) PlayerAction(
@@ -66,34 +78,11 @@ func (s *gameServer) GameEvents(
 	request *pb.GameEventsSubscriptionRequest,
 	stream pb.Game_GameEventsServer,
 ) error {
-	events := make(chan *pb.GameEvent)
-	waiter := sync.WaitGroup{}
-
+	subscriber := newSubscriber(stream)
 	// Subscribe this client
-	s.eventListener = append(s.eventListener, events)
-
-	waiter.Add(1)
-	go listenToEvents(&stream, events, &waiter)
-	waiter.Wait()
-
-	// TODO Remove subscription
-
+	s.subscribers = append(s.subscribers, subscriber)
+	<-subscriber.done
 	return nil
-}
-
-func listenToEvents(
-	stream *pb.Game_GameEventsServer,
-	events chan *pb.GameEvent,
-	waiter *sync.WaitGroup,
-) error {
-	defer waiter.Done()
-	for {
-		event := <-events
-
-		if err := (*stream).Send(event); err != nil {
-			return err
-		}
-	}
 }
 
 func enableCors(resp *http.ResponseWriter) {
@@ -114,21 +103,21 @@ func main() {
 
 	httpServer := &http.Server{
 		Addr: fmt.Sprintf("%s:%d", *host, *port),
-	}
-	httpServer.Handler = http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
-		enableCors(&resp)
-		if req.Method == "OPTIONS" {
-			resp.WriteHeader(http.StatusOK)
-			return
-		}
+		Handler: http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+			enableCors(&resp)
+			if req.Method == "OPTIONS" {
+				resp.WriteHeader(http.StatusOK)
+				return
+			}
 
-		if wrappedGrpc.IsGrpcWebRequest(req) {
-			wrappedGrpc.ServeHTTP(resp, req)
-			return
-		}
-		// Fall back to other servers.
-		http.DefaultServeMux.ServeHTTP(resp, req)
-	})
+			if wrappedGrpc.IsGrpcWebRequest(req) {
+				wrappedGrpc.ServeHTTP(resp, req)
+				return
+			}
+			// Fall back to other servers.
+			http.DefaultServeMux.ServeHTTP(resp, req)
+		}),
+	}
 
 	fmt.Printf("Starting game server at: http://%s:%d\n", *host, *port)
 	err := httpServer.ListenAndServe()
