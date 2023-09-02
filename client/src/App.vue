@@ -20,7 +20,11 @@ async function join() {
       },
     },
   })
-  console.log('join response', response)
+  if (response.response.oneofKind === 'error') {
+    console.error('error joining:', response.response.error.message)
+    return
+  }
+  name.value = ''
 }
 
 const events = ref<GameEvent[]>([])
@@ -32,43 +36,23 @@ onBeforeUnmount(() => unsubscribe())
 </script>
 
 <template>
-  <div>
-    <div class="game">
+  <div class="grid gap-2 p-3">
+    <div>
+      <h2>Join Game</h2>
       <form @submit.prevent="join">
-        <input v-model="name" placeholder="How shall we call you?" />
+        <input
+          v-model="name"
+          placeholder="How shall we call you?"
+          class="p-2 border border-slate-400"
+        />
       </form>
-      <header>
-        <h2>Events</h2>
-      </header>
-      <div class="events">
-        <div v-for="(event, index) in events" :key="index">
-          <h3>{{ event.date }}</h3>
-          <pre>{{ event.message }}</pre>
-        </div>
+    </div>
+    <div class="events">
+      <h2>Events</h2>
+      <div v-for="(event, index) in events" :key="index">
+        <h3>{{ event.date }}</h3>
+        <pre>{{ event.message }}</pre>
       </div>
     </div>
   </div>
 </template>
-
-<style scoped>
-.game {
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  height: 100vh;
-  width: 100%;
-}
-
-.events {
-  overflow-y: auto;
-}
-
-form {
-  padding: 1rem;
-}
-
-input {
-  padding: 1rem;
-  font-size: 1.2rem;
-  width: 100%;
-}
-</style>
