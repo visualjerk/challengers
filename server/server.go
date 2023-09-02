@@ -19,16 +19,16 @@ var (
 	port = flag.Int("port", 50051, "The server port")
 )
 
-type subscriber struct {
+type Subscriber struct {
 	stream pb.Game_GameEventsServer
 	done   chan bool
 }
 
-func newSubscriber(stream pb.Game_GameEventsServer) *subscriber {
-	return &subscriber{stream, make(chan bool)}
+func newSubscriber(stream pb.Game_GameEventsServer) *Subscriber {
+	return &Subscriber{stream, make(chan bool)}
 }
 
-func (s *subscriber) send(event *pb.GameEvent) error {
+func (s *Subscriber) send(event *pb.GameEvent) error {
 	if err := s.stream.Send(event); err != nil {
 		s.done <- true
 		return err
@@ -36,7 +36,7 @@ func (s *subscriber) send(event *pb.GameEvent) error {
 	return nil
 }
 
-func (s *subscriber) sendMany(events []*pb.GameEvent) error {
+func (s *Subscriber) sendMany(events []*pb.GameEvent) error {
 	for _, event := range events {
 		if err := s.send(event); err != nil {
 			return err
@@ -45,34 +45,39 @@ func (s *subscriber) sendMany(events []*pb.GameEvent) error {
 	return nil
 }
 
-type subscribers struct {
-	all map[string]*subscriber
+type GameEvents struct {
+	subscribers map[string]*Subscriber
+	events      []*pb.GameEvent
 }
 
-func newSubscribers() *subscribers {
-	return &subscribers{
-		map[string]*subscriber{},
+func newGameEvents() *GameEvents {
+	return &GameEvents{
+		map[string]*Subscriber{},
+		[]*pb.GameEvent{},
 	}
 }
 
-func (s *subscribers) add(stream pb.Game_GameEventsServer, initialEvents []*pb.GameEvent) error {
+func (s *GameEvents) addSubscriber(stream pb.Game_GameEventsServer) error {
 	subscriber := newSubscriber(stream)
 	id := uuid.NewString()
-	s.all[id] = subscriber
+	s.subscribers[id] = subscriber
 	fmt.Printf("added subscriber with id %s\n", id)
 
-	defer delete(s.all, id)
+	defer delete(s.subscribers, id)
 	defer fmt.Printf("removed subscriber with id %s\n", id)
 
-	subscriber.sendMany(initialEvents)
+	// Send events that have been published so far
+	subscriber.sendMany(s.events)
 
 	// Keep stream open until subscriber is done
 	<-subscriber.done
 	return nil
 }
 
-func (s *subscribers) notify(event *pb.GameEvent) {
-	for id, subscriber := range s.all {
+func (s *GameEvents) publish(event *pb.GameEvent) {
+	s.events = append(s.events, event)
+
+	for id, subscriber := range s.subscribers {
 		fmt.Printf("notify subscriber with id %s\n", id)
 		go subscriber.send(event)
 	}
@@ -80,21 +85,18 @@ func (s *subscribers) notify(event *pb.GameEvent) {
 
 type gameServer struct {
 	pb.GameServer
-	subscribers *subscribers
-	events      []*pb.GameEvent
+	events *GameEvents
 }
 
 func newServer() *gameServer {
 	s := &gameServer{
-		subscribers: newSubscribers(),
-		events:      []*pb.GameEvent{},
+		events: newGameEvents(),
 	}
 	return s
 }
 
 func (s *gameServer) addEvent(event *pb.GameEvent) {
-	s.subscribers.notify(event)
-	s.events = append(s.events, event)
+	s.events.publish(event)
 }
 
 func (s *gameServer) PlayerAction(
@@ -122,7 +124,7 @@ func (s *gameServer) GameEvents(
 	request *pb.GameEventsSubscriptionRequest,
 	stream pb.Game_GameEventsServer,
 ) error {
-	return s.subscribers.add(stream, s.events)
+	return s.events.addSubscriber(stream)
 }
 
 func enableCors(resp *http.ResponseWriter) {
