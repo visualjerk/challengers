@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sync"
 
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
 	"google.golang.org/grpc"
@@ -20,18 +21,24 @@ var (
 
 type gameServer struct {
 	pb.GameServer
-	events chan *pb.GameEvent
+	eventListener []chan *pb.GameEvent
 }
 
 func newServer() *gameServer {
 	s := &gameServer{
-		events: make(chan *pb.GameEvent),
+		eventListener: []chan *pb.GameEvent{},
 	}
 	return s
 }
 
 func (s *gameServer) addEvent(event *pb.GameEvent) {
-	s.events <- event
+	for _, events := range s.eventListener {
+		go publishEvent(events, event)
+	}
+}
+
+func publishEvent(events chan *pb.GameEvent, event *pb.GameEvent) {
+	events <- event
 }
 
 func (s *gameServer) PlayerAction(
@@ -59,10 +66,31 @@ func (s *gameServer) GameEvents(
 	request *pb.GameEventsSubscriptionRequest,
 	stream pb.Game_GameEventsServer,
 ) error {
-	for {
-		event := <-s.events
+	events := make(chan *pb.GameEvent)
+	waiter := sync.WaitGroup{}
 
-		if err := stream.Send(event); err != nil {
+	// Subscribe this client
+	s.eventListener = append(s.eventListener, events)
+
+	waiter.Add(1)
+	go listenToEvents(&stream, events, &waiter)
+	waiter.Wait()
+
+	// TODO Remove subscription
+
+	return nil
+}
+
+func listenToEvents(
+	stream *pb.Game_GameEventsServer,
+	events chan *pb.GameEvent,
+	waiter *sync.WaitGroup,
+) error {
+	defer waiter.Done()
+	for {
+		event := <-events
+
+		if err := (*stream).Send(event); err != nil {
 			return err
 		}
 	}
@@ -102,7 +130,7 @@ func main() {
 		http.DefaultServeMux.ServeHTTP(resp, req)
 	})
 
-	fmt.Printf("Starting game server at: http://%s:%d", *host, *port)
+	fmt.Printf("Starting game server at: http://%s:%d\n", *host, *port)
 	err := httpServer.ListenAndServe()
 	if err != nil {
 		log.Fatalf("Failed to serve: %v", err)
