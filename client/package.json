@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "pnpm build-protobuf && vue-tsc && vite build",
-    "build-protobuf": "npx protoc --ts_out ./api --proto_path ../grpc ../grpc/game.proto",
+    "build:proto": "npx protoc --ts_out ./api --proto_path ../proto ../proto/game.proto",
     "preview": "vite preview"
   },
   "dependencies": {

@@ -5,7 +5,13 @@
 Generate code with:
 
 ```bash
-pnpm build-protobuf
+pnpm build:proto
+```
+
+## Run Dev Server
+
+```bash
+pnpm dev
 ```
 
 ## Recommended IDE Setup
