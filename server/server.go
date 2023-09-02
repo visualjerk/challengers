@@ -35,22 +35,55 @@ func (s *subscriber) notify(event *pb.GameEvent) error {
 	return nil
 }
 
+type subscribers struct {
+	all    map[int]*subscriber
+	lastId int
+}
+
+func newSubscribers() *subscribers {
+	return &subscribers{
+		map[int]*subscriber{},
+		0,
+	}
+}
+
+func (s *subscribers) add(stream pb.Game_GameEventsServer) error {
+	subscriber := newSubscriber(stream)
+	id := s.lastId + 1
+	s.all[id] = subscriber
+	fmt.Printf("added subscriber with id %d\n", id)
+
+	s.lastId = id
+
+	// Remove once it is done
+	<-subscriber.done
+	delete(s.all, id)
+	fmt.Printf("removed subscriber with id %d\n", id)
+
+	return nil
+}
+
+func (s *subscribers) notify(event *pb.GameEvent) {
+	for id, subscriber := range s.all {
+		fmt.Printf("notify subscriber with id %d\n", id)
+		go subscriber.notify(event)
+	}
+}
+
 type gameServer struct {
 	pb.GameServer
-	subscribers []*subscriber
+	subscribers *subscribers
 }
 
 func newServer() *gameServer {
 	s := &gameServer{
-		subscribers: []*subscriber{},
+		subscribers: newSubscribers(),
 	}
 	return s
 }
 
 func (s *gameServer) addEvent(event *pb.GameEvent) {
-	for _, subscriber := range s.subscribers {
-		go subscriber.notify(event)
-	}
+	s.subscribers.notify(event)
 }
 
 func (s *gameServer) PlayerAction(
@@ -78,10 +111,7 @@ func (s *gameServer) GameEvents(
 	request *pb.GameEventsSubscriptionRequest,
 	stream pb.Game_GameEventsServer,
 ) error {
-	subscriber := newSubscriber(stream)
-	// Subscribe this client
-	s.subscribers = append(s.subscribers, subscriber)
-	<-subscriber.done
+	s.subscribers.add(stream)
 	return nil
 }
 
