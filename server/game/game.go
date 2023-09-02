@@ -3,6 +3,7 @@ package game
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -95,7 +96,7 @@ func (s *GameServer) PlayerAction(
 ) (*pb.PlayerActionResponse, error) {
 	s.addEvent(&pb.GameEvent{
 		Id:   uuid.NewString(),
-		Date: "DATE",
+		Date: time.Now().Format(time.RFC3339Nano),
 		Message: &pb.GameEvent_PlayerJoined{
 			PlayerJoined: &pb.PlayerJoined{
 				Id:   uuid.NewString(),
