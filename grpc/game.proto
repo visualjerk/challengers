@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+option go_package = "visualjerk.de/challengers/grpc";
+
+service Game {
+  rpc PlayerAction(PlayerActionRequest) returns (PlayerActionResponse) {}
+  rpc GameEvents(GameEventsSubscriptionRequest) returns (stream GameEvent) {}
+}
+
+message PlayerActionRequest {
+  oneof message {
+    PlayerJoined player_joined = 10;
+    PlayerLeft player_left = 11;
+  }
+}
+
+message PlayerActionResponse {
+  oneof response {
+    Success success = 10;
+    Error error = 11;
+  }
+}
+
+message Success {}
+message Error {
+  string message = 1;
+}
+
+message GameEventsSubscriptionRequest {}
+
+message GameEvent {
+  string id = 1;
+  string date = 2;
+  oneof message {
+    PlayerJoined player_joined = 10;
+    PlayerLeft player_left = 11;
+  };
+}
+
+message PlayerJoined {
+  string id = 1;
+  string name = 2;
+}
+
+message PlayerLeft {
+  string id = 1;
+  string name = 2;
+}
