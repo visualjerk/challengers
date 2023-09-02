@@ -20,17 +20,35 @@ var (
 
 type gameServer struct {
 	pb.GameServer
+	events chan *pb.GameEvent
 }
 
 func newServer() *gameServer {
-	s := &gameServer{}
+	s := &gameServer{
+		events: make(chan *pb.GameEvent),
+	}
 	return s
+}
+
+func (s *gameServer) addEvent(event *pb.GameEvent) {
+	s.events <- event
 }
 
 func (s *gameServer) PlayerAction(
 	context context.Context,
 	request *pb.PlayerActionRequest,
 ) (*pb.PlayerActionResponse, error) {
+	s.addEvent(&pb.GameEvent{
+		Id:   "ID",
+		Date: "DATE",
+		Message: &pb.GameEvent_PlayerJoined{
+			PlayerJoined: &pb.PlayerJoined{
+				Id:   request.GetPlayerJoined().Id,
+				Name: request.GetPlayerJoined().Name,
+			},
+		},
+	})
+
 	response := &pb.PlayerActionResponse{
 		Response: &pb.PlayerActionResponse_Success{},
 	}
@@ -41,23 +59,13 @@ func (s *gameServer) GameEvents(
 	request *pb.GameEventsSubscriptionRequest,
 	stream pb.Game_GameEventsServer,
 ) error {
-	for i := 0; i < 10; i++ {
-		event := &pb.GameEvent{
-			Id:   fmt.Sprintf("%d", i),
-			Date: "",
-			Message: &pb.GameEvent_PlayerJoined{
-				PlayerJoined: &pb.PlayerJoined{
-					Id:   fmt.Sprintf("PlayerID%d", i),
-					Name: "Han Solo",
-				},
-			},
-		}
+	for {
+		event := <-s.events
 
 		if err := stream.Send(event); err != nil {
 			return err
 		}
 	}
-	return nil
 }
 
 func enableCors(resp *http.ResponseWriter) {
