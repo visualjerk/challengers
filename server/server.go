@@ -27,10 +27,19 @@ func newSubscriber(stream pb.Game_GameEventsServer) *subscriber {
 	return &subscriber{stream, make(chan bool)}
 }
 
-func (s *subscriber) notify(event *pb.GameEvent) error {
+func (s *subscriber) send(event *pb.GameEvent) error {
 	if err := s.stream.Send(event); err != nil {
 		s.done <- true
 		return err
+	}
+	return nil
+}
+
+func (s *subscriber) sendMany(events []*pb.GameEvent) error {
+	for _, event := range events {
+		if err := s.send(event); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -47,43 +56,47 @@ func newSubscribers() *subscribers {
 	}
 }
 
-func (s *subscribers) add(stream pb.Game_GameEventsServer) error {
+func (s *subscribers) add(stream pb.Game_GameEventsServer, initialEvents []*pb.GameEvent) error {
 	subscriber := newSubscriber(stream)
 	id := s.lastId + 1
 	s.all[id] = subscriber
 	fmt.Printf("added subscriber with id %d\n", id)
-
 	s.lastId = id
 
-	// Remove once it is done
-	<-subscriber.done
-	delete(s.all, id)
-	fmt.Printf("removed subscriber with id %d\n", id)
+	defer delete(s.all, id)
+	defer fmt.Printf("removed subscriber with id %d\n", id)
 
+	subscriber.sendMany(initialEvents)
+
+	// Keep stream open until subscriber is done
+	<-subscriber.done
 	return nil
 }
 
 func (s *subscribers) notify(event *pb.GameEvent) {
 	for id, subscriber := range s.all {
 		fmt.Printf("notify subscriber with id %d\n", id)
-		go subscriber.notify(event)
+		go subscriber.send(event)
 	}
 }
 
 type gameServer struct {
 	pb.GameServer
 	subscribers *subscribers
+	events      []*pb.GameEvent
 }
 
 func newServer() *gameServer {
 	s := &gameServer{
 		subscribers: newSubscribers(),
+		events:      []*pb.GameEvent{},
 	}
 	return s
 }
 
 func (s *gameServer) addEvent(event *pb.GameEvent) {
 	s.subscribers.notify(event)
+	s.events = append(s.events, event)
 }
 
 func (s *gameServer) PlayerAction(
@@ -111,8 +124,7 @@ func (s *gameServer) GameEvents(
 	request *pb.GameEventsSubscriptionRequest,
 	stream pb.Game_GameEventsServer,
 ) error {
-	s.subscribers.add(stream)
-	return nil
+	return s.subscribers.add(stream, s.events)
 }
 
 func enableCors(resp *http.ResponseWriter) {
