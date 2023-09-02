@@ -9,9 +9,18 @@ service Game {
 
 message PlayerActionRequest {
   oneof message {
-    PlayerJoined player_joined = 10;
-    PlayerLeft player_left = 11;
+    PlayerActionJoin player_join = 10;
+    PlayerActionLeave player_leave = 11;
   }
+}
+
+
+message PlayerActionJoin {
+  string name = 1;
+}
+
+message PlayerActionLeave {
+  string id = 1;
 }
 
 message PlayerActionResponse {

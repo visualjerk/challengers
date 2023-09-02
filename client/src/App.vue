@@ -13,9 +13,8 @@ const name = ref('')
 async function join() {
   const { response } = await gameClient.playerAction({
     message: {
-      oneofKind: 'playerJoined',
-      playerJoined: {
-        id: 'hans',
+      oneofKind: 'playerJoin',
+      playerJoin: {
         name: unref(name),
       },
     },

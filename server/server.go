@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
 	"google.golang.org/grpc"
 
@@ -45,26 +46,23 @@ func (s *subscriber) sendMany(events []*pb.GameEvent) error {
 }
 
 type subscribers struct {
-	all    map[int]*subscriber
-	lastId int
+	all map[string]*subscriber
 }
 
 func newSubscribers() *subscribers {
 	return &subscribers{
-		map[int]*subscriber{},
-		0,
+		map[string]*subscriber{},
 	}
 }
 
 func (s *subscribers) add(stream pb.Game_GameEventsServer, initialEvents []*pb.GameEvent) error {
 	subscriber := newSubscriber(stream)
-	id := s.lastId + 1
+	id := uuid.NewString()
 	s.all[id] = subscriber
-	fmt.Printf("added subscriber with id %d\n", id)
-	s.lastId = id
+	fmt.Printf("added subscriber with id %s\n", id)
 
 	defer delete(s.all, id)
-	defer fmt.Printf("removed subscriber with id %d\n", id)
+	defer fmt.Printf("removed subscriber with id %s\n", id)
 
 	subscriber.sendMany(initialEvents)
 
@@ -75,7 +73,7 @@ func (s *subscribers) add(stream pb.Game_GameEventsServer, initialEvents []*pb.G
 
 func (s *subscribers) notify(event *pb.GameEvent) {
 	for id, subscriber := range s.all {
-		fmt.Printf("notify subscriber with id %d\n", id)
+		fmt.Printf("notify subscriber with id %s\n", id)
 		go subscriber.send(event)
 	}
 }
@@ -104,12 +102,12 @@ func (s *gameServer) PlayerAction(
 	request *pb.PlayerActionRequest,
 ) (*pb.PlayerActionResponse, error) {
 	s.addEvent(&pb.GameEvent{
-		Id:   "ID",
+		Id:   uuid.NewString(),
 		Date: "DATE",
 		Message: &pb.GameEvent_PlayerJoined{
 			PlayerJoined: &pb.PlayerJoined{
-				Id:   request.GetPlayerJoined().Id,
-				Name: request.GetPlayerJoined().Name,
+				Id:   uuid.NewString(),
+				Name: request.GetPlayerJoin().GetName(),
 			},
 		},
 	})
