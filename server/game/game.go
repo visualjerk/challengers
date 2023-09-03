@@ -11,16 +11,16 @@ import (
 )
 
 type Subscriber struct {
-	stream pb.Game_GameEventsServer
+	stream *pb.Game_GameEventsServer
 	done   chan bool
 }
 
-func newSubscriber(stream pb.Game_GameEventsServer) *Subscriber {
+func newSubscriber(stream *pb.Game_GameEventsServer) *Subscriber {
 	return &Subscriber{stream, make(chan bool)}
 }
 
 func (s *Subscriber) send(event *pb.GameEvent) error {
-	if err := s.stream.Send(event); err != nil {
+	if err := (*s.stream).Send(event); err != nil {
 		s.done <- true
 		return err
 	}
@@ -48,62 +48,60 @@ func newGameEvents() *GameEvents {
 	}
 }
 
-func (s *GameEvents) addSubscriber(stream pb.Game_GameEventsServer) error {
+func (g *GameEvents) addSubscriber(stream *pb.Game_GameEventsServer) error {
 	subscriber := newSubscriber(stream)
 	id := uuid.NewString()
-	s.subscribers[id] = subscriber
+	g.subscribers[id] = subscriber
 	fmt.Printf("added subscriber with id %s\n", id)
 
-	defer delete(s.subscribers, id)
+	defer delete(g.subscribers, id)
 	defer fmt.Printf("removed subscriber with id %s\n", id)
 
 	// Send events that have been published so far
-	subscriber.sendMany(s.events)
+	subscriber.sendMany(g.events)
 
 	// Keep stream open until subscriber is done
 	<-subscriber.done
 	return nil
 }
 
-func (s *GameEvents) publish(event *pb.GameEvent) {
-	s.events = append(s.events, event)
+func (g *GameEvents) publish(event *pb.GameEvent) {
+	g.events = append(g.events, event)
 
-	for id, subscriber := range s.subscribers {
+	for id, subscriber := range g.subscribers {
 		fmt.Printf("notify subscriber with id %s\n", id)
 		go subscriber.send(event)
 	}
 }
 
-type GameServer struct {
-	pb.GameServer
-	events *GameEvents
+type Player struct {
+	id   string
+	name string
 }
 
-func NewServer() *GameServer {
-	s := &GameServer{
-		events: newGameEvents(),
+type Game struct {
+	id      string
+	seats   int
+	players map[string]*Player
+	events  *GameEvents
+}
+
+func NewGame(id string, seats int) *Game {
+	return &Game{
+		id:      id,
+		seats:   seats,
+		players: map[string]*Player{},
+		events:  newGameEvents(),
 	}
-	return s
 }
 
-func (s *GameServer) addEvent(event *pb.GameEvent) {
-	s.events.publish(event)
-}
+func (g *Game) HandlePlayerAction(request *pb.PlayerActionRequest) (*pb.PlayerActionResponse, error) {
+	event, error := g.getPlayerActionEvent(request)
+	if error != nil {
+		return nil, error
+	}
 
-func (s *GameServer) PlayerAction(
-	context context.Context,
-	request *pb.PlayerActionRequest,
-) (*pb.PlayerActionResponse, error) {
-	s.addEvent(&pb.GameEvent{
-		Id:   uuid.NewString(),
-		Date: time.Now().Format(time.RFC3339Nano),
-		Message: &pb.GameEvent_PlayerJoined{
-			PlayerJoined: &pb.PlayerJoined{
-				Id:   uuid.NewString(),
-				Name: request.GetPlayerJoin().GetName(),
-			},
-		},
-	})
+	g.addEvent(event)
 
 	response := &pb.PlayerActionResponse{
 		Response: &pb.PlayerActionResponse_Success{},
@@ -111,9 +109,87 @@ func (s *GameServer) PlayerAction(
 	return response, nil
 }
 
+func (g *Game) Subscribe(stream *pb.Game_GameEventsServer) error {
+	return g.events.addSubscriber(stream)
+}
+
+func (g *Game) addEvent(event *pb.GameEvent) {
+	g.events.publish(event)
+}
+
+func (g *Game) getPlayerActionEvent(request *pb.PlayerActionRequest) (*pb.GameEvent, error) {
+	event := &pb.GameEvent{
+		Id:      uuid.NewString(),
+		Date:    time.Now().Format(time.RFC3339Nano),
+		Message: nil,
+	}
+	switch message := request.Message.(type) {
+	case *pb.PlayerActionRequest_PlayerJoin:
+		event.Message = &pb.GameEvent_PlayerJoined{
+			PlayerJoined: &pb.PlayerJoined{
+				Id:   uuid.NewString(),
+				Name: message.PlayerJoin.Name,
+			},
+		}
+	case *pb.PlayerActionRequest_PlayerLeave:
+		event.Message = &pb.GameEvent_PlayerLeft{
+			PlayerLeft: &pb.PlayerLeft{
+				Id:   message.PlayerLeave.PlayerId,
+				Name: message.PlayerLeave.PlayerId,
+			},
+		}
+	default:
+		return nil, fmt.Errorf("unknown player action")
+	}
+	return event, nil
+}
+
+type GameServer struct {
+	pb.GameServer
+	games map[string]*Game
+}
+
+func NewServer() *GameServer {
+	s := &GameServer{
+		games: map[string]*Game{},
+	}
+	return s
+}
+
+func (s *GameServer) PlayerAction(
+	context context.Context,
+	request *pb.PlayerActionRequest,
+) (*pb.PlayerActionResponse, error) {
+	game := s.games[request.GameId]
+
+	if game == nil {
+		return nil, fmt.Errorf("game with id %s not found", request.GameId)
+	}
+
+	return game.HandlePlayerAction(request)
+}
+
 func (s *GameServer) GameEvents(
 	request *pb.GameEventsSubscriptionRequest,
 	stream pb.Game_GameEventsServer,
 ) error {
-	return s.events.addSubscriber(stream)
+	game := s.games[request.GameId]
+
+	if game == nil {
+		return fmt.Errorf("game with id %s not found", request.GameId)
+	}
+
+	error := game.Subscribe(&stream)
+	return error
+}
+
+func (s *GameServer) CreateGame(
+	context context.Context,
+	request *pb.CreateGameRequest,
+) (*pb.CreateGameResponse, error) {
+	id := uuid.NewString()
+	game := NewGame(id, 4)
+	s.games[id] = game
+	fmt.Printf("created game with id %s\n", id)
+	return &pb.CreateGameResponse{Id: id}, nil
 }

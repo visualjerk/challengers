@@ -3,11 +3,19 @@ syntax = "proto3";
 option go_package = "visualjerk.de/challengers/grpc";
 
 service Game {
+  rpc CreateGame(CreateGameRequest) returns (CreateGameResponse) {}
   rpc PlayerAction(PlayerActionRequest) returns (PlayerActionResponse) {}
   rpc GameEvents(GameEventsSubscriptionRequest) returns (stream GameEvent) {}
 }
 
+message CreateGameRequest {}
+message CreateGameResponse {
+  string id = 1;
+}
+
 message PlayerActionRequest {
+  string gameId = 1;
+  optional string playerId = 2;
   oneof message {
     PlayerActionJoin player_join = 10;
     PlayerActionLeave player_leave = 11;
@@ -16,11 +24,11 @@ message PlayerActionRequest {
 
 
 message PlayerActionJoin {
-  string name = 1;
+  string name = 2;
 }
 
 message PlayerActionLeave {
-  string id = 1;
+  string playerId = 2;
 }
 
 message PlayerActionResponse {
@@ -35,7 +43,9 @@ message Error {
   string message = 1;
 }
 
-message GameEventsSubscriptionRequest {}
+message GameEventsSubscriptionRequest {
+  string gameId = 1;
+}
 
 message GameEvent {
   string id = 1;
