@@ -1,16 +1,11 @@
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, ref, unref, computed } from 'vue'
 import { GameEvent } from '../../api/game'
-import { GameClient } from '../../api/game.client'
-import { GrpcWebFetchTransport } from '@protobuf-ts/grpcweb-transport'
+import { gameClient } from '../api/game'
 import { useRoute } from 'vue-router'
 
 const route = useRoute()
 const gameId = computed(() => route.params.id as string)
-const rpcTransport = new GrpcWebFetchTransport({
-  baseUrl: 'http://0.0.0.0:50051',
-})
-const gameClient = new GameClient(rpcTransport)
 
 const name = ref('')
 async function join() {

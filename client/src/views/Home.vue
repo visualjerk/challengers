@@ -1,14 +1,8 @@
 <script setup lang="ts">
-import { GameClient } from '../../api/game.client'
-import { GrpcWebFetchTransport } from '@protobuf-ts/grpcweb-transport'
 import { useRouter } from 'vue-router'
+import { gameClient } from '../api/game'
 
-const rpcTransport = new GrpcWebFetchTransport({
-  baseUrl: 'http://0.0.0.0:50051',
-})
-const gameClient = new GameClient(rpcTransport)
 const router = useRouter()
-
 async function createGame() {
   const { response } = await gameClient.createGame({})
   router.push(`/game/${response.id}`)

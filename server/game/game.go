@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"google.golang.org/grpc/metadata"
 
 	pb "visualjerk.de/challengers/grpc"
 )
@@ -95,8 +96,8 @@ func NewGame(id string, seats int) *Game {
 	}
 }
 
-func (g *Game) HandlePlayerAction(request *pb.PlayerActionRequest) (*pb.PlayerActionResponse, error) {
-	event, error := g.getPlayerActionEvent(request)
+func (g *Game) HandlePlayerAction(request *pb.PlayerActionRequest, playerId string) (*pb.PlayerActionResponse, error) {
+	event, error := g.getPlayerActionEvent(request, playerId)
 	if error != nil {
 		return nil, error
 	}
@@ -117,7 +118,7 @@ func (g *Game) addEvent(event *pb.GameEvent) {
 	g.events.publish(event)
 }
 
-func (g *Game) getPlayerActionEvent(request *pb.PlayerActionRequest) (*pb.GameEvent, error) {
+func (g *Game) getPlayerActionEvent(request *pb.PlayerActionRequest, playerId string) (*pb.GameEvent, error) {
 	event := &pb.GameEvent{
 		Id:      uuid.NewString(),
 		Date:    time.Now().Format(time.RFC3339Nano),
@@ -125,17 +126,33 @@ func (g *Game) getPlayerActionEvent(request *pb.PlayerActionRequest) (*pb.GameEv
 	}
 	switch message := request.Message.(type) {
 	case *pb.PlayerActionRequest_PlayerJoin:
+		player := &Player{
+			id:   playerId,
+			name: message.PlayerJoin.Name,
+		}
+		g.players[playerId] = player
+
 		event.Message = &pb.GameEvent_PlayerJoined{
 			PlayerJoined: &pb.PlayerJoined{
-				Id:   uuid.NewString(),
-				Name: message.PlayerJoin.Name,
+				Id:   player.id,
+				Name: player.name,
 			},
 		}
 	case *pb.PlayerActionRequest_PlayerLeave:
+		if playerId != message.PlayerLeave.PlayerId {
+			return nil, fmt.Errorf("unauthorized action")
+		}
+		player := g.players[playerId]
+		if player == nil {
+			return nil, fmt.Errorf("player is not in this game")
+		}
+
+		g.players[playerId] = nil
+
 		event.Message = &pb.GameEvent_PlayerLeft{
 			PlayerLeft: &pb.PlayerLeft{
-				Id:   message.PlayerLeave.PlayerId,
-				Name: message.PlayerLeave.PlayerId,
+				Id:   player.id,
+				Name: player.name,
 			},
 		}
 	default:
@@ -146,12 +163,16 @@ func (g *Game) getPlayerActionEvent(request *pb.PlayerActionRequest) (*pb.GameEv
 
 type GameServer struct {
 	pb.GameServer
-	games map[string]*Game
+	games           map[string]*Game
+	accounts        map[string]*Account
+	accountsByToken map[string]*Account
 }
 
 func NewServer() *GameServer {
 	s := &GameServer{
-		games: map[string]*Game{},
+		games:           map[string]*Game{},
+		accounts:        map[string]*Account{},
+		accountsByToken: map[string]*Account{},
 	}
 	return s
 }
@@ -160,13 +181,18 @@ func (s *GameServer) PlayerAction(
 	context context.Context,
 	request *pb.PlayerActionRequest,
 ) (*pb.PlayerActionResponse, error) {
+	account, error := s.getAccount(context)
+	if error != nil {
+		return nil, error
+	}
+
 	game := s.games[request.GameId]
 
 	if game == nil {
 		return nil, fmt.Errorf("game with id %s not found", request.GameId)
 	}
 
-	return game.HandlePlayerAction(request)
+	return game.HandlePlayerAction(request, account.id)
 }
 
 func (s *GameServer) GameEvents(
@@ -187,9 +213,58 @@ func (s *GameServer) CreateGame(
 	context context.Context,
 	request *pb.CreateGameRequest,
 ) (*pb.CreateGameResponse, error) {
+	if _, error := s.getAccount(context); error != nil {
+		return nil, error
+	}
+
 	id := uuid.NewString()
 	game := NewGame(id, 4)
 	s.games[id] = game
 	fmt.Printf("created game with id %s\n", id)
 	return &pb.CreateGameResponse{Id: id}, nil
+}
+
+func (s *GameServer) getAccount(context context.Context) (*Account, error) {
+	authdata := metadata.ValueFromIncomingContext(context, "authorization")
+
+	if len(authdata) < 1 {
+		return nil, fmt.Errorf("missing auth token")
+	}
+
+	account := s.accountsByToken[authdata[0]]
+
+	if account == nil {
+		return nil, fmt.Errorf("account not found")
+	}
+
+	return account, nil
+}
+
+type Account struct {
+	token string
+	id    string
+}
+
+func NewAccount(token string, id string) *Account {
+	return &Account{
+		token,
+		id,
+	}
+}
+
+func (s *GameServer) CreateAccount(
+	context context.Context,
+	request *pb.CreateAccountRequest,
+) (*pb.CreateAccountResponse, error) {
+	token := uuid.NewString()
+	id := uuid.NewString()
+	account := NewAccount(token, id)
+
+	s.accounts[id] = account
+
+	// TODO: Encrypt token
+	s.accountsByToken[token] = account
+	fmt.Printf("created account with id %s\n", id)
+
+	return &pb.CreateAccountResponse{Token: token}, nil
 }
