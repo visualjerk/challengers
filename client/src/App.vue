@@ -1,17 +1,7 @@
-<script setup lang="ts">
-import { createAccount } from './api/game'
-import { ref } from 'vue'
-
-const pending = ref(true)
-async function createGame() {
-  pending.value = true
-  await createAccount()
-  pending.value = false
-}
-createGame()
-</script>
+<script setup lang="ts"></script>
 
 <template>
-  <div v-if="pending">Creating account ...</div>
-  <RouterView v-else />
+  <div class="max-w-xl">
+    <RouterView />
+  </div>
 </template>

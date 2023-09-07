@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"google.golang.org/grpc/metadata"
 
+	"visualjerk.de/challengers/account"
 	pb "visualjerk.de/challengers/grpc"
 )
 
@@ -163,16 +163,14 @@ func (g *Game) getPlayerActionEvent(request *pb.PlayerActionRequest, playerId st
 
 type GameServer struct {
 	pb.GameServer
-	games           map[string]*Game
-	accounts        map[string]*Account
-	accountsByToken map[string]*Account
+	games         map[string]*Game
+	accountServer *account.AccountServer
 }
 
-func NewServer() *GameServer {
+func NewServer(accountServer *account.AccountServer) *GameServer {
 	s := &GameServer{
-		games:           map[string]*Game{},
-		accounts:        map[string]*Account{},
-		accountsByToken: map[string]*Account{},
+		games:         map[string]*Game{},
+		accountServer: accountServer,
 	}
 	return s
 }
@@ -181,7 +179,7 @@ func (s *GameServer) PlayerAction(
 	context context.Context,
 	request *pb.PlayerActionRequest,
 ) (*pb.PlayerActionResponse, error) {
-	account, error := s.getAccount(context)
+	account, error := s.accountServer.GetAccount(context)
 	if error != nil {
 		return nil, error
 	}
@@ -192,7 +190,7 @@ func (s *GameServer) PlayerAction(
 		return nil, fmt.Errorf("game with id %s not found", request.GameId)
 	}
 
-	return game.HandlePlayerAction(request, account.id)
+	return game.HandlePlayerAction(request, account.Id)
 }
 
 func (s *GameServer) GameEvents(
@@ -213,7 +211,7 @@ func (s *GameServer) CreateGame(
 	context context.Context,
 	request *pb.CreateGameRequest,
 ) (*pb.CreateGameResponse, error) {
-	if _, error := s.getAccount(context); error != nil {
+	if _, error := s.accountServer.GetAccount(context); error != nil {
 		return nil, error
 	}
 
@@ -222,49 +220,4 @@ func (s *GameServer) CreateGame(
 	s.games[id] = game
 	fmt.Printf("created game with id %s\n", id)
 	return &pb.CreateGameResponse{Id: id}, nil
-}
-
-func (s *GameServer) getAccount(context context.Context) (*Account, error) {
-	authdata := metadata.ValueFromIncomingContext(context, "authorization")
-
-	if len(authdata) < 1 {
-		return nil, fmt.Errorf("missing auth token")
-	}
-
-	account := s.accountsByToken[authdata[0]]
-
-	if account == nil {
-		return nil, fmt.Errorf("account not found")
-	}
-
-	return account, nil
-}
-
-type Account struct {
-	token string
-	id    string
-}
-
-func NewAccount(token string, id string) *Account {
-	return &Account{
-		token,
-		id,
-	}
-}
-
-func (s *GameServer) CreateAccount(
-	context context.Context,
-	request *pb.CreateAccountRequest,
-) (*pb.CreateAccountResponse, error) {
-	token := uuid.NewString()
-	id := uuid.NewString()
-	account := NewAccount(token, id)
-
-	s.accounts[id] = account
-
-	// TODO: Encrypt token
-	s.accountsByToken[token] = account
-	fmt.Printf("created account with id %s\n", id)
-
-	return &pb.CreateAccountResponse{Token: token}, nil
 }

@@ -1,7 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Home from './views/Home.vue'
+import { addAccountRouting } from './account/account-routing'
 
-export default createRouter({
+const router = createRouter({
   history: createWebHistory(),
   routes: [
     {
@@ -14,3 +15,7 @@ export default createRouter({
     },
   ],
 })
+
+addAccountRouting(router)
+
+export { router }

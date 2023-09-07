@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "pnpm build-protobuf && vue-tsc && vite build",
-    "build:proto": "npx protoc --ts_out ./api --proto_path ../proto ../proto/game.proto",
+    "build:proto": "npx protoc --ts_out ./api --proto_path ../proto ../proto/account.proto ../proto/game.proto",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -14,6 +14,7 @@
     "@protobuf-ts/plugin": "^2.9.0",
     "@protobuf-ts/runtime": "^2.9.0",
     "@protobuf-ts/runtime-rpc": "^2.9.0",
+    "@vueuse/core": "^10.4.1",
     "vue": "^3.3.4",
     "vue-router": "4"
   },

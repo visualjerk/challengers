@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+option go_package = "visualjerk.de/challengers/grpc";
+
+service Account {
+  rpc CreateAccount(CreateAccountRequest) returns (CreateAccountResponse) {}
+}
+
+message CreateAccountRequest {
+  string name = 1;
+}
+message CreateAccountResponse {
+  string token = 1;
+  string name = 2;
+}

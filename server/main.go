@@ -9,6 +9,7 @@ import (
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
 	"google.golang.org/grpc"
 
+	"visualjerk.de/challengers/account"
 	"visualjerk.de/challengers/game"
 	pb "visualjerk.de/challengers/grpc"
 )
@@ -30,7 +31,9 @@ func main() {
 	var opts []grpc.ServerOption
 
 	grpcServer := grpc.NewServer(opts...)
-	pb.RegisterGameServer(grpcServer, game.NewServer())
+	accountServer := account.NewAccountServer()
+	pb.RegisterAccountServer(grpcServer, accountServer)
+	pb.RegisterGameServer(grpcServer, game.NewServer(accountServer))
 
 	wrappedGrpc := grpcweb.WrapServer(grpcServer)
 
