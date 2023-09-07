@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
-import { gameClient } from '../api/game'
+import { gameClient } from './game-api'
 
 const router = useRouter()
 async function createGame() {
@@ -11,7 +11,7 @@ async function createGame() {
 
 <template>
   <div class="grid gap-2 p-3">
-    <h1 class="text-xl">Home</h1>
+    <h1 class="text-xl">Games</h1>
     <div>
       <button @click="createGame">Create New Game</button>
     </div>

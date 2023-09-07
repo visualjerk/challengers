@@ -1,7 +1,6 @@
 <script setup lang="ts">
+import { gameClient, GameEvent } from './game-api'
 import { onMounted, onBeforeUnmount, ref, unref, computed } from 'vue'
-import { GameEvent } from '../../api/game'
-import { gameClient } from '../api/game'
 import { useRoute } from 'vue-router'
 
 const route = useRoute()
