@@ -1,16 +1,20 @@
 <script setup lang="ts">
 import { ref, unref } from 'vue'
 import { useAccountApi } from './account-api'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 const { create, pending } = useAccountApi()
 
 const router = useRouter()
+const route = useRoute()
 
 const name = ref('')
 async function createAccount() {
   await create(unref(name))
-  router.push('/')
+
+  const redirect = route.query.redirectTo as string | undefined
+
+  router.push(redirect ?? '/')
 }
 </script>
 

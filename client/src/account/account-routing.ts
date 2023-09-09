@@ -11,6 +11,9 @@ const authenticationMiddleware: NavigationGuard = async (to) => {
   if (to.name !== createAccountRoute.name && !(await isAuthenticated())) {
     return {
       name: createAccountRoute.name,
+      query: {
+        redirectTo: to.fullPath,
+      },
     }
   }
 }
