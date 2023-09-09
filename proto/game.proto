@@ -22,13 +22,9 @@ message PlayerActionRequest {
   }
 }
 
-message PlayerActionJoin {
-  string name = 2;
-}
+message PlayerActionJoin {}
 
-message PlayerActionLeave {
-  string playerId = 2;
-}
+message PlayerActionLeave {}
 
 message PlayerActionResponse {
   oneof response {

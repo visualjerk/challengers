@@ -96,8 +96,8 @@ func NewGame(id string, seats int) *Game {
 	}
 }
 
-func (g *Game) HandlePlayerAction(request *pb.PlayerActionRequest, playerId string) (*pb.PlayerActionResponse, error) {
-	event, error := g.getPlayerActionEvent(request, playerId)
+func (g *Game) HandlePlayerAction(request *pb.PlayerActionRequest, player *Player) (*pb.PlayerActionResponse, error) {
+	event, error := g.getPlayerActionEvent(request, player)
 	if error != nil {
 		return nil, error
 	}
@@ -118,19 +118,15 @@ func (g *Game) addEvent(event *pb.GameEvent) {
 	g.events.publish(event)
 }
 
-func (g *Game) getPlayerActionEvent(request *pb.PlayerActionRequest, playerId string) (*pb.GameEvent, error) {
+func (g *Game) getPlayerActionEvent(request *pb.PlayerActionRequest, player *Player) (*pb.GameEvent, error) {
 	event := &pb.GameEvent{
 		Id:      uuid.NewString(),
 		Date:    time.Now().Format(time.RFC3339Nano),
 		Message: nil,
 	}
-	switch message := request.Message.(type) {
+	switch request.Message.(type) {
 	case *pb.PlayerActionRequest_PlayerJoin:
-		player := &Player{
-			id:   playerId,
-			name: message.PlayerJoin.Name,
-		}
-		g.players[playerId] = player
+		g.players[player.id] = player
 
 		event.Message = &pb.GameEvent_PlayerJoined{
 			PlayerJoined: &pb.PlayerJoined{
@@ -139,20 +135,17 @@ func (g *Game) getPlayerActionEvent(request *pb.PlayerActionRequest, playerId st
 			},
 		}
 	case *pb.PlayerActionRequest_PlayerLeave:
-		if playerId != message.PlayerLeave.PlayerId {
-			return nil, fmt.Errorf("unauthorized action")
-		}
-		player := g.players[playerId]
-		if player == nil {
+		leavingPlayer := g.players[player.id]
+		if leavingPlayer == nil {
 			return nil, fmt.Errorf("player is not in this game")
 		}
 
-		g.players[playerId] = nil
+		delete(g.players, leavingPlayer.id)
 
 		event.Message = &pb.GameEvent_PlayerLeft{
 			PlayerLeft: &pb.PlayerLeft{
-				Id:   player.id,
-				Name: player.name,
+				Id:   leavingPlayer.id,
+				Name: leavingPlayer.name,
 			},
 		}
 	default:
@@ -190,7 +183,10 @@ func (s *GameServer) PlayerAction(
 		return nil, fmt.Errorf("game with id %s not found", request.GameId)
 	}
 
-	return game.HandlePlayerAction(request, account.Id)
+	return game.HandlePlayerAction(request, &Player{
+		name: account.Name,
+		id:   account.Id,
+	})
 }
 
 func (s *GameServer) GameEvents(

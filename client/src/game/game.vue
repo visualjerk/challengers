@@ -6,22 +6,34 @@ import { useRoute } from 'vue-router'
 const route = useRoute()
 const gameId = computed(() => route.params.id as string)
 
-const name = ref('')
+const joined = ref(false)
 async function join() {
   const { response } = await gameClient.playerAction({
     gameId: unref(gameId),
     message: {
       oneofKind: 'playerJoin',
-      playerJoin: {
-        name: unref(name),
-      },
+      playerJoin: {},
     },
   })
   if (response.response.oneofKind === 'error') {
     console.error('error joining:', response.response.error.message)
     return
   }
-  name.value = ''
+  joined.value = true
+}
+async function leave() {
+  const { response } = await gameClient.playerAction({
+    gameId: unref(gameId),
+    message: {
+      oneofKind: 'playerLeave',
+      playerLeave: {},
+    },
+  })
+  if (response.response.oneofKind === 'error') {
+    console.error('error joining:', response.response.error.message)
+    return
+  }
+  joined.value = false
 }
 
 const events = ref<GameEvent[]>([])
@@ -42,15 +54,15 @@ onBeforeUnmount(() => unsubscribe())
 <template>
   <div class="grid gap-2 p-3">
     <h1 class="text-xl">Game</h1>
-    <div>
-      <h2>Join This Game</h2>
-      <form @submit.prevent="join">
-        <input
-          v-model="name"
-          placeholder="How shall we call you?"
-          class="p-2 border border-slate-400"
-        />
-      </form>
+    <div v-if="!joined">
+      <button @click="join" class="bg-indigo-600 text-white p-2">
+        Join Game
+      </button>
+    </div>
+    <div v-else>
+      <button @click="leave" class="bg-indigo-600 text-white p-2">
+        Leave Game
+      </button>
     </div>
     <div class="events">
       <h2>Events</h2>
