@@ -7,8 +7,8 @@ const createAccountRoute: RouteRecordRaw = {
   component: () => import('./create-account.vue'),
 }
 
-const accountMiddleware: NavigationGuard = (to) => {
-  if (to.name !== createAccountRoute.name && !isAuthenticated()) {
+const authenticationMiddleware: NavigationGuard = async (to) => {
+  if (to.name !== createAccountRoute.name && !(await isAuthenticated())) {
     return {
       name: createAccountRoute.name,
     }
@@ -17,5 +17,5 @@ const accountMiddleware: NavigationGuard = (to) => {
 
 export function addAccountRouting(router: Router) {
   router.addRoute(createAccountRoute)
-  router.beforeEach(accountMiddleware)
+  router.beforeEach(authenticationMiddleware)
 }

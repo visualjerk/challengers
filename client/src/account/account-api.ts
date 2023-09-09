@@ -1,7 +1,7 @@
 import { API_BASE_URL } from './../config/api-config'
 import { AccountClient } from '../../api/account.client'
 
-import { computed, ref, unref } from 'vue'
+import { ref } from 'vue'
 import { useStorage } from '@vueuse/core'
 import { GrpcWebFetchTransport } from '@protobuf-ts/grpcweb-transport'
 import { RpcInterceptor } from '@protobuf-ts/runtime-rpc'
@@ -12,7 +12,7 @@ type AuthStore = {
   token?: string
 }
 
-function getAuthToken() {
+function getAuthToken(): null | string {
   const store = localStorage.getItem(STORAGE_KEY)
   if (!store) {
     return null
@@ -21,11 +21,11 @@ function getAuthToken() {
   return JSON.parse(store)?.token
 }
 
-export function isAuthenticated() {
-  return !!getAuthToken()
+function removeAuthToken() {
+  localStorage.removeItem(STORAGE_KEY)
 }
 
-export const AuthenticationInterceptor: RpcInterceptor = {
+export const authenticationInterceptor: RpcInterceptor = {
   interceptUnary(next, method, input, options) {
     const token = getAuthToken()
 
@@ -37,15 +37,38 @@ export const AuthenticationInterceptor: RpcInterceptor = {
   },
 }
 
+const rpcTransport = new GrpcWebFetchTransport({
+  baseUrl: API_BASE_URL,
+  interceptors: [authenticationInterceptor],
+})
+const accountApi = new AccountClient(rpcTransport)
+
+async function verifyAuthToken(token: string): Promise<boolean> {
+  try {
+    await accountApi.verifyAccount({
+      token,
+    })
+  } catch (e) {
+    console.error(e)
+    return false
+  }
+  return true
+}
+
+export async function isAuthenticated(): Promise<boolean> {
+  const token = getAuthToken()
+  if (!token) {
+    return false
+  }
+  const verified = await verifyAuthToken(token)
+  if (!verified) {
+    removeAuthToken()
+  }
+  return verified
+}
+
 export function useAccountApi() {
   const store = useStorage<AuthStore>(STORAGE_KEY, {})
-  const isAuthenticated = computed(() => !!unref(store).token)
-
-  const rpcTransport = new GrpcWebFetchTransport({
-    baseUrl: API_BASE_URL,
-    interceptors: [AuthenticationInterceptor],
-  })
-  const accountApi = new AccountClient(rpcTransport)
 
   const pending = ref(false)
   async function create(name: string) {
@@ -68,6 +91,5 @@ export function useAccountApi() {
   return {
     create,
     pending,
-    isAuthenticated,
   }
 }

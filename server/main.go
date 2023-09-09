@@ -11,7 +11,6 @@ import (
 
 	"visualjerk.de/challengers/account"
 	"visualjerk.de/challengers/game"
-	pb "visualjerk.de/challengers/grpc"
 )
 
 var (
@@ -31,9 +30,11 @@ func main() {
 	var opts []grpc.ServerOption
 
 	grpcServer := grpc.NewServer(opts...)
+
 	accountServer := account.NewAccountServer()
-	pb.RegisterAccountServer(grpcServer, accountServer)
-	pb.RegisterGameServer(grpcServer, game.NewServer(accountServer))
+	accountServer.AddToGrpcServer(grpcServer)
+	gameServer := game.NewServer(accountServer)
+	gameServer.AddToGrpcServer(grpcServer)
 
 	wrappedGrpc := grpcweb.WrapServer(grpcServer)
 

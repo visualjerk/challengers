@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 
 	pb "visualjerk.de/challengers/grpc"
@@ -38,6 +39,10 @@ func NewAccountServer() *AccountServer {
 	return s
 }
 
+func (s *AccountServer) AddToGrpcServer(server *grpc.Server) {
+	pb.RegisterAccountServer(server, s)
+}
+
 func (s *AccountServer) CreateAccount(
 	context context.Context,
 	request *pb.CreateAccountRequest,
@@ -53,6 +58,21 @@ func (s *AccountServer) CreateAccount(
 	fmt.Printf("created account with id %s\n", id)
 
 	return &pb.CreateAccountResponse{Token: token}, nil
+}
+
+func (s *AccountServer) VerifyAccount(
+	context context.Context,
+	request *pb.VerifyAccountRequest,
+) (*pb.VerifyAccountResponse, error) {
+	account := s.accountsByToken[request.Token]
+
+	if account == nil {
+		return nil, fmt.Errorf("invalid token")
+	}
+	return &pb.VerifyAccountResponse{
+		Token: account.Token,
+		Name:  account.Token,
+	}, nil
 }
 
 func (s *AccountServer) GetAccount(context context.Context) (*Account, error) {

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"google.golang.org/grpc"
 
 	"visualjerk.de/challengers/account"
 	pb "visualjerk.de/challengers/grpc"
@@ -185,6 +186,10 @@ func NewServer(accountServer *account.AccountServer) *GameServer {
 		accountServer: accountServer,
 	}
 	return s
+}
+
+func (s *GameServer) AddToGrpcServer(server *grpc.Server) {
+	pb.RegisterGameServer(server, s)
 }
 
 func (s *GameServer) PlayerAction(

@@ -4,12 +4,23 @@ option go_package = "visualjerk.de/challengers/grpc";
 
 service Account {
   rpc CreateAccount(CreateAccountRequest) returns (CreateAccountResponse) {}
+  rpc VerifyAccount(VerifyAccountRequest) returns (VerifyAccountResponse) {}
 }
 
 message CreateAccountRequest {
   string name = 1;
 }
+
 message CreateAccountResponse {
+  string token = 1;
+  string name = 2;
+}
+
+message VerifyAccountRequest {
+  string token = 1;
+}
+
+message VerifyAccountResponse {
   string token = 1;
   string name = 2;
 }
