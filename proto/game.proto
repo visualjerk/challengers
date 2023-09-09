@@ -45,18 +45,26 @@ message GameEventsSubscriptionRequest {
 message GameEvent {
   string id = 1;
   string date = 2;
+  GameState state = 3;
   oneof message {
     PlayerJoined player_joined = 10;
     PlayerLeft player_left = 11;
   };
 }
 
-message PlayerJoined {
+message GameState {
+  repeated Player players = 1;
+}
+
+message Player {
   string id = 1;
   string name = 2;
 }
 
+message PlayerJoined {
+  Player player = 1;
+}
+
 message PlayerLeft {
-  string id = 1;
-  string name = 2;
+  Player player = 1;
 }

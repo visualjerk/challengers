@@ -1,5 +1,5 @@
 import { GameClient } from '../../api/game.client'
-export { GameEvent } from '../../api/game'
+export { GameEvent, GameState } from '../../api/game'
 
 import { GrpcWebFetchTransport } from '@protobuf-ts/grpcweb-transport'
 import { API_BASE_URL } from '../config/api-config'

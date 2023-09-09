@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { gameClient, GameEvent } from './game-api'
+import { gameClient, GameEvent, GameState } from './game-api'
 import { onMounted, onBeforeUnmount, ref, unref, computed } from 'vue'
 import { useRoute } from 'vue-router'
 
@@ -37,6 +37,7 @@ async function leave() {
 }
 
 const events = ref<GameEvent[]>([])
+const state = ref<GameState>()
 let unsubscribe: any
 
 onMounted(() => {
@@ -45,6 +46,7 @@ onMounted(() => {
   })
   unsubscribe = gameEvents.responses.onMessage((event) => {
     events.value.unshift(event)
+    state.value = event.state
   })
 })
 
@@ -64,11 +66,17 @@ onBeforeUnmount(() => unsubscribe())
         Leave Game
       </button>
     </div>
-    <div class="events">
-      <h2>Events</h2>
-      <div v-for="(event, index) in events" :key="index">
-        <h3>{{ event.date }}</h3>
-        <pre>{{ event.message }}</pre>
+    <div class="grid grid-cols-2 gap-2">
+      <div>
+        <h2>State</h2>
+        <pre>{{ state }}</pre>
+      </div>
+      <div>
+        <h2>Events</h2>
+        <div v-for="(event, index) in events" :key="index">
+          <h3>{{ event.date }}</h3>
+          <pre>{{ event.message }}</pre>
+        </div>
       </div>
     </div>
   </div>

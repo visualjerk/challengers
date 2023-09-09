@@ -118,11 +118,25 @@ func (g *Game) addEvent(event *pb.GameEvent) {
 	g.events.publish(event)
 }
 
+func (g *Game) getGameState() *pb.GameState {
+	players := []*pb.Player{}
+
+	for _, player := range g.players {
+		players = append(players, &pb.Player{
+			Id:   player.id,
+			Name: player.name,
+		})
+	}
+
+	return &pb.GameState{
+		Players: players,
+	}
+}
+
 func (g *Game) getPlayerActionEvent(request *pb.PlayerActionRequest, player *Player) (*pb.GameEvent, error) {
 	event := &pb.GameEvent{
-		Id:      uuid.NewString(),
-		Date:    time.Now().Format(time.RFC3339Nano),
-		Message: nil,
+		Id:   uuid.NewString(),
+		Date: time.Now().Format(time.RFC3339Nano),
 	}
 	switch request.Message.(type) {
 	case *pb.PlayerActionRequest_PlayerJoin:
@@ -130,8 +144,10 @@ func (g *Game) getPlayerActionEvent(request *pb.PlayerActionRequest, player *Pla
 
 		event.Message = &pb.GameEvent_PlayerJoined{
 			PlayerJoined: &pb.PlayerJoined{
-				Id:   player.id,
-				Name: player.name,
+				Player: &pb.Player{
+					Id:   player.id,
+					Name: player.name,
+				},
 			},
 		}
 	case *pb.PlayerActionRequest_PlayerLeave:
@@ -144,13 +160,16 @@ func (g *Game) getPlayerActionEvent(request *pb.PlayerActionRequest, player *Pla
 
 		event.Message = &pb.GameEvent_PlayerLeft{
 			PlayerLeft: &pb.PlayerLeft{
-				Id:   leavingPlayer.id,
-				Name: leavingPlayer.name,
+				Player: &pb.Player{
+					Id:   player.id,
+					Name: player.name,
+				},
 			},
 		}
 	default:
 		return nil, fmt.Errorf("unknown player action")
 	}
+	event.State = g.getGameState()
 	return event, nil
 }
 
