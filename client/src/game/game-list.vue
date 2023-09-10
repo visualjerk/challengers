@@ -1,12 +1,20 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
-import { gameClient } from './game-api'
+import { gameClient, GameEntry } from './game-api'
+import { ref } from 'vue'
 
 const router = useRouter()
 async function createGame() {
   const { response } = await gameClient.createGame({})
   router.push(`/game/${response.id}`)
 }
+
+const games = ref<GameEntry[]>([])
+async function loadGames() {
+  const { response } = await gameClient.list({})
+  games.value = response.games
+}
+loadGames()
 </script>
 
 <template>
@@ -15,5 +23,12 @@ async function createGame() {
     <div>
       <button @click="createGame">Create New Game</button>
     </div>
+    <ul>
+      <li v-for="game in games" :key="game.id">
+        <RouterLink :to="`/game/${game.id}`">
+          Open game with {{ game.state?.players.length }} players
+        </RouterLink>
+      </li>
+    </ul>
   </div>
 </template>

@@ -229,6 +229,26 @@ func (s *GameServer) GameEvents(
 	return error
 }
 
+func (s *GameServer) List(
+	context context.Context,
+	request *pb.ListGameRequest,
+) (*pb.ListGameResponse, error) {
+	if _, error := s.accountServer.GetAccount(context); error != nil {
+		return nil, error
+	}
+
+	games := []*pb.GameEntry{}
+
+	for _, game := range s.games {
+		games = append(games, &pb.GameEntry{
+			Id:    game.id,
+			State: game.getGameState(),
+		})
+	}
+
+	return &pb.ListGameResponse{Games: games}, nil
+}
+
 func (s *GameServer) CreateGame(
 	context context.Context,
 	request *pb.CreateGameRequest,

@@ -3,9 +3,20 @@ syntax = "proto3";
 option go_package = "visualjerk.de/challengers/grpc";
 
 service Game {
+  rpc List(ListGameRequest) returns (ListGameResponse) {}
   rpc CreateGame(CreateGameRequest) returns (CreateGameResponse) {}
   rpc PlayerAction(PlayerActionRequest) returns (PlayerActionResponse) {}
   rpc GameEvents(GameEventsSubscriptionRequest) returns (stream GameEvent) {}
+}
+
+message ListGameRequest {}
+message ListGameResponse {
+  repeated GameEntry games = 1;
+}
+
+message GameEntry {
+  string id = 1;
+  GameState state = 2; 
 }
 
 message CreateGameRequest {}
