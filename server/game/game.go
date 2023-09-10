@@ -7,6 +7,8 @@ import (
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"visualjerk.de/challengers/account"
 	pb "visualjerk.de/challengers/grpc"
@@ -154,7 +156,7 @@ func (g *Game) getPlayerActionEvent(request *pb.PlayerActionRequest, player *Pla
 	case *pb.PlayerActionRequest_PlayerLeave:
 		leavingPlayer := g.players[player.id]
 		if leavingPlayer == nil {
-			return nil, fmt.Errorf("player is not in this game")
+			return nil, status.Error(codes.NotFound, "player is not in this game")
 		}
 
 		delete(g.players, leavingPlayer.id)
@@ -168,7 +170,7 @@ func (g *Game) getPlayerActionEvent(request *pb.PlayerActionRequest, player *Pla
 			},
 		}
 	default:
-		return nil, fmt.Errorf("unknown player action")
+		return nil, status.Error(codes.NotFound, "unknown player action")
 	}
 	event.State = g.getGameState()
 	return event, nil
@@ -204,7 +206,7 @@ func (s *GameServer) PlayerAction(
 	game := s.games[request.GameId]
 
 	if game == nil {
-		return nil, fmt.Errorf("game with id %s not found", request.GameId)
+		return nil, status.Errorf(codes.NotFound, "game with id %s not found", request.GameId)
 	}
 
 	return game.HandlePlayerAction(request, &Player{
@@ -220,7 +222,7 @@ func (s *GameServer) GameEvents(
 	game := s.games[request.GameId]
 
 	if game == nil {
-		return fmt.Errorf("game with id %s not found", request.GameId)
+		return status.Errorf(codes.NotFound, "game with id %s not found", request.GameId)
 	}
 
 	error := game.Subscribe(&stream)

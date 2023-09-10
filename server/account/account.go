@@ -6,7 +6,9 @@ import (
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 
 	pb "visualjerk.de/challengers/grpc"
 )
@@ -67,7 +69,7 @@ func (s *AccountServer) VerifyAccount(
 	account := s.accountsByToken[request.Token]
 
 	if account == nil {
-		return nil, fmt.Errorf("invalid token")
+		return nil, status.Error(codes.Unauthenticated, "invalid token")
 	}
 	return &pb.VerifyAccountResponse{
 		Token: account.Token,
@@ -79,13 +81,13 @@ func (s *AccountServer) GetAccount(context context.Context) (*Account, error) {
 	authdata := metadata.ValueFromIncomingContext(context, "authorization")
 
 	if len(authdata) < 1 {
-		return nil, fmt.Errorf("missing auth token")
+		return nil, status.Error(codes.Unauthenticated, "missing token")
 	}
 
 	account := s.accountsByToken[authdata[0]]
 
 	if account == nil {
-		return nil, fmt.Errorf("account not found")
+		return nil, status.Error(codes.Unauthenticated, "invalid token")
 	}
 
 	return account, nil

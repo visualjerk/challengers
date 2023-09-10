@@ -48,7 +48,7 @@ async function verifyAuthToken(token: string): Promise<boolean> {
     await accountApi.verifyAccount({
       token,
     })
-  } catch (e) {
+  } catch (e: any) {
     console.error(e)
     return false
   }
