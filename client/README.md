@@ -5,13 +5,13 @@
 Generate code with:
 
 ```bash
-pnpm build:proto
+bun build:proto
 ```
 
 ## Run Dev Server
 
 ```bash
-pnpm dev
+bun dev
 ```
 
 ## Recommended IDE Setup

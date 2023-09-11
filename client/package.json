@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "pnpm build-protobuf && vue-tsc && vite build",
-    "build:proto": "npx protoc --ts_out ./api --proto_path ../proto ../proto/account.proto ../proto/game.proto",
+    "build": "bun build-protobuf && vue-tsc && vite build",
+    "build:proto": "bun protoc --ts_out ./api --proto_path ../proto ../proto/account.proto ../proto/game.proto",
     "preview": "vite preview"
   },
   "dependencies": {
