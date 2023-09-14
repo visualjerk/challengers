@@ -169,6 +169,8 @@ func (g *Game) getPlayerActionEvent(request *pb.PlayerActionRequest, player *Pla
 				},
 			},
 		}
+	case *pb.PlayerActionRequest_PlayerChooseCard:
+		fmt.Printf("player choose card %v", request.GetPlayerChooseCard().CardId)
 	default:
 		return nil, status.Error(codes.NotFound, "unknown player action")
 	}

@@ -30,12 +30,17 @@ message PlayerActionRequest {
   oneof message {
     PlayerActionJoin player_join = 10;
     PlayerActionLeave player_leave = 11;
+    PlayerActionChooseCard player_choose_card = 12;
   }
 }
 
 message PlayerActionJoin {}
 
 message PlayerActionLeave {}
+
+message PlayerActionChooseCard {
+  string cardId = 1;
+}
 
 message PlayerActionResponse {
   oneof response {
