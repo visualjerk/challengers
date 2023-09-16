@@ -88,6 +88,7 @@ type Game struct {
 	seats   int
 	players map[string]*Player
 	events  *GameEvents
+	started bool
 }
 
 func NewGame(id string, seats int) *Game {
@@ -96,7 +97,12 @@ func NewGame(id string, seats int) *Game {
 		seats:   seats,
 		players: map[string]*Player{},
 		events:  newGameEvents(),
+		started: false,
 	}
+}
+
+func (g *Game) isFull() bool {
+	return g.seats == len(g.players)
 }
 
 func (g *Game) HandlePlayerAction(request *pb.PlayerActionRequest, player *Player) (*pb.PlayerActionResponse, error) {
@@ -133,6 +139,7 @@ func (g *Game) getGameState() *pb.GameState {
 
 	return &pb.GameState{
 		Players: players,
+		Started: g.started,
 	}
 }
 
@@ -150,8 +157,15 @@ func (g *Game) reactToPlayerAction(request *pb.PlayerActionRequest, player *Play
 }
 
 func (g *Game) handlePlayerJoin(player *Player) error {
-	g.players[player.id] = player
+	if g.started {
+		return status.Error(codes.FailedPrecondition, "game has already started")
+	}
 
+	if g.isFull() {
+		return status.Error(codes.FailedPrecondition, "no empty seats available")
+	}
+
+	g.players[player.id] = player
 	event := &pb.GameEvent{
 		Message: &pb.GameEvent_PlayerJoined{
 			PlayerJoined: &pb.PlayerJoined{
@@ -163,10 +177,28 @@ func (g *Game) handlePlayerJoin(player *Player) error {
 		}}
 	g.addEvent(event)
 
+	if g.isFull() {
+		g.handleGameStart()
+	}
+
 	return nil
 }
 
+func (g *Game) handleGameStart() {
+	g.started = true
+	event := &pb.GameEvent{
+		Message: &pb.GameEvent_GameStarted{
+			GameStarted: &pb.GameStarted{},
+		},
+	}
+	g.addEvent(event)
+}
+
 func (g *Game) handlePlayerLeave(player *Player) error {
+	if g.started {
+		return status.Error(codes.FailedPrecondition, "game has already started")
+	}
+
 	leavingPlayer := g.players[player.id]
 	if leavingPlayer == nil {
 		return status.Error(codes.NotFound, "player is not in this game")
