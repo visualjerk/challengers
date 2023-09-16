@@ -100,13 +100,10 @@ func NewGame(id string, seats int) *Game {
 }
 
 func (g *Game) HandlePlayerAction(request *pb.PlayerActionRequest, player *Player) (*pb.PlayerActionResponse, error) {
-	event, error := g.getPlayerActionEvent(request, player)
+	error := g.reactToPlayerAction(request, player)
 	if error != nil {
 		return nil, error
 	}
-
-	g.addEvent(event)
-
 	response := &pb.PlayerActionResponse{
 		Response: &pb.PlayerActionResponse_Success{},
 	}
@@ -118,6 +115,9 @@ func (g *Game) Subscribe(stream *pb.Game_GameEventsServer) error {
 }
 
 func (g *Game) addEvent(event *pb.GameEvent) {
+	event.Id = uuid.NewString()
+	event.Date = time.Now().Format(time.RFC3339Nano)
+	event.State = g.getGameState()
 	g.events.publish(event)
 }
 
@@ -136,46 +136,60 @@ func (g *Game) getGameState() *pb.GameState {
 	}
 }
 
-func (g *Game) getPlayerActionEvent(request *pb.PlayerActionRequest, player *Player) (*pb.GameEvent, error) {
-	event := &pb.GameEvent{
-		Id:   uuid.NewString(),
-		Date: time.Now().Format(time.RFC3339Nano),
-	}
+func (g *Game) reactToPlayerAction(request *pb.PlayerActionRequest, player *Player) error {
 	switch request.Message.(type) {
 	case *pb.PlayerActionRequest_PlayerJoin:
-		g.players[player.id] = player
+		return g.handlePlayerJoin(player)
+	case *pb.PlayerActionRequest_PlayerLeave:
+		return g.handlePlayerLeave(player)
+	case *pb.PlayerActionRequest_PlayerChooseCard:
+		return g.handlePlayerChooseCard(player, request.GetPlayerChooseCard().CardId)
+	default:
+		return status.Error(codes.NotFound, "unknown player action")
+	}
+}
 
-		event.Message = &pb.GameEvent_PlayerJoined{
+func (g *Game) handlePlayerJoin(player *Player) error {
+	g.players[player.id] = player
+
+	event := &pb.GameEvent{
+		Message: &pb.GameEvent_PlayerJoined{
 			PlayerJoined: &pb.PlayerJoined{
 				Player: &pb.Player{
 					Id:   player.id,
 					Name: player.name,
 				},
 			},
-		}
-	case *pb.PlayerActionRequest_PlayerLeave:
-		leavingPlayer := g.players[player.id]
-		if leavingPlayer == nil {
-			return nil, status.Error(codes.NotFound, "player is not in this game")
-		}
+		}}
+	g.addEvent(event)
 
-		delete(g.players, leavingPlayer.id)
+	return nil
+}
 
-		event.Message = &pb.GameEvent_PlayerLeft{
+func (g *Game) handlePlayerLeave(player *Player) error {
+	leavingPlayer := g.players[player.id]
+	if leavingPlayer == nil {
+		return status.Error(codes.NotFound, "player is not in this game")
+	}
+
+	delete(g.players, leavingPlayer.id)
+
+	event := &pb.GameEvent{
+		Message: &pb.GameEvent_PlayerLeft{
 			PlayerLeft: &pb.PlayerLeft{
 				Player: &pb.Player{
 					Id:   player.id,
 					Name: player.name,
 				},
 			},
-		}
-	case *pb.PlayerActionRequest_PlayerChooseCard:
-		fmt.Printf("player choose card %v", request.GetPlayerChooseCard().CardId)
-	default:
-		return nil, status.Error(codes.NotFound, "unknown player action")
-	}
-	event.State = g.getGameState()
-	return event, nil
+		}}
+	g.addEvent(event)
+	return nil
+}
+
+func (g *Game) handlePlayerChooseCard(player *Player, cardId string) error {
+	fmt.Printf("player %v choose card %v", player.name, cardId)
+	return nil
 }
 
 type GameServer struct {
@@ -260,7 +274,7 @@ func (s *GameServer) CreateGame(
 	}
 
 	id := uuid.NewString()
-	game := NewGame(id, 4)
+	game := NewGame(id, 2)
 	s.games[id] = game
 	fmt.Printf("created game with id %s\n", id)
 	return &pb.CreateGameResponse{Id: id}, nil

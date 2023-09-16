@@ -26,7 +26,6 @@ message CreateGameResponse {
 
 message PlayerActionRequest {
   string gameId = 1;
-  optional string playerId = 2;
   oneof message {
     PlayerActionJoin player_join = 10;
     PlayerActionLeave player_leave = 11;
@@ -65,11 +64,13 @@ message GameEvent {
   oneof message {
     PlayerJoined player_joined = 10;
     PlayerLeft player_left = 11;
+    GameStarted game_started = 12;
   };
 }
 
 message GameState {
   repeated Player players = 1;
+  bool started = 2;
 }
 
 message Player {
@@ -84,3 +85,5 @@ message PlayerJoined {
 message PlayerLeft {
   Player player = 1;
 }
+
+message GameStarted {}
